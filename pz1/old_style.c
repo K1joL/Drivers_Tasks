@@ -71,7 +71,7 @@ static struct file_operations fops =
     .unlocked_ioctl = device_ioctl,
 };
 
-static int __init simple_char_device_init(void) 
+int init_module(void) 
 {
     major = register_chrdev(0, DEVICE_NAME, &fops);
     if (major < 0) {
@@ -90,12 +90,9 @@ static int __init simple_char_device_init(void)
     return 0;
 }
 
-static void __exit simple_char_device_exit(void) 
+void cleanup_module(void) 
 {
     kfree(buffer);
     unregister_chrdev(major, DEVICE_NAME);
     printk(KERN_INFO "Stariy driver unregistered\n");
 }
-
-module_init(simple_char_device_init);
-module_exit(simple_char_device_exit);
