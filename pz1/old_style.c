@@ -4,6 +4,7 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/ioctl.h>
+#include <linux/device.h>
 
 MODULE_LICENSE("GPL");
 
@@ -15,20 +16,23 @@ static int major;
 static char *buffer;
 static size_t buffer_size = 1024;
 
+static struct class *dev_class;
+static struct device *dev_device;
+
 static ssize_t device_read(struct file *file, char __user *user_buffer, size_t count, loff_t *offset) 
 {
-    if (*offset >= buffer_size) 
+   	printk(KERN_INFO "Stariy driver: offset %lld count %d\n", *offset, count);
+	printk(KERN_INFO "Stariy driver: %p\n", buffer);
+    if (count > buffer_size) 
         return 0;
-    if (*offset + count > buffer_size)
-        count = buffer_size - *offset;
-    if (copy_to_user(user_buffer, buffer + *offset, count))
+    if (copy_to_user(user_buffer, buffer, count))
         return -EFAULT;
-    *offset += count;
     return count;
 }
 
 static ssize_t device_write(struct file *file, const char __user *user_buffer, size_t count, loff_t *offset) 
 {
+	printk(KERN_INFO "Stariy driver: offset %lld count %d\n", *offset, count);
     if (*offset >= buffer_size)
         return -ENOSPC;
     if (*offset + count > buffer_size)
@@ -45,6 +49,7 @@ static long device_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	{
         case IOCTL_RESET_BUFFER:
             memset(buffer, 0, buffer_size);
+            file->f_pos = 0;
             break;
         case IOCTL_SET_SIZE:
             if (arg > 0) 
@@ -55,6 +60,7 @@ static long device_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 buffer = new_buffer;
                 buffer_size = arg;
                 memset(buffer, 0, buffer_size);
+                file->f_pos = 0;
             }
             break;
         default:
@@ -78,9 +84,26 @@ int init_module(void)
         printk(KERN_ALERT "Failed to register stariy driver\n");
         return major;
     }
+	
+    dev_class = class_create("stariy_driver_class");
+    if (IS_ERR(dev_class)) {
+        unregister_chrdev(major, DEVICE_NAME);
+        printk(KERN_ALERT "Failed to create device class\n");
+        return PTR_ERR(dev_class);
+    }
 
+    dev_device = device_create(dev_class, NULL, MKDEV(major, 0), NULL, DEVICE_NAME);
+    if (IS_ERR(dev_device)) {
+       	class_destroy(dev_class);
+        unregister_chrdev(major, DEVICE_NAME);
+        printk(KERN_ALERT "Failed to create device\n");
+        return PTR_ERR(dev_device);
+    }
+	
     buffer = kmalloc(buffer_size, GFP_KERNEL);
     if (!buffer) {
+    	device_destroy(dev_class, MKDEV(major, 0));
+        class_destroy(dev_class);
         unregister_chrdev(major, DEVICE_NAME);
         return -ENOMEM;
     }
@@ -92,6 +115,8 @@ int init_module(void)
 
 void cleanup_module(void) 
 {
+	device_destroy(dev_class, MKDEV(major, 0));
+	class_destroy(dev_class);
     kfree(buffer);
     unregister_chrdev(major, DEVICE_NAME);
     printk(KERN_INFO "Stariy driver unregistered\n");
