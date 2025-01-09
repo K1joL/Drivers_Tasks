@@ -113,6 +113,8 @@ static int __init my_char_driver_init(void) {
     ret = cdev_add(&cdev, dev, 1);
     if (ret < 0) {
         printk(KERN_ERR "Failed to add char device\n");
+        device_destroy(dev_class, dev);
+        class_destroy(dev_class);
         unregister_chrdev(Major, "new_dev_1");
         return ret;
     }
@@ -121,6 +123,7 @@ static int __init my_char_driver_init(void) {
     if (ret < 0) {
         printk(KERN_ERR "Failed to create sysfs entry for start_timer\n");
         device_destroy(dev_class, dev);
+        class_destroy(dev_class);
         cdev_del(&cdev);
         unregister_chrdev(Major, "new_dev_1");
         return ret;
@@ -130,6 +133,7 @@ static int __init my_char_driver_init(void) {
         printk(KERN_ERR "Failed to create sysfs entry for stop_timer\n");
         device_remove_file(ret, &dev_attr_start_timer);
         device_destroy(dev_class, dev);
+        class_destroy(dev_class);
         cdev_del(&cdev);
         unregister_chrdev(Major, "new_dev_1");
         return ret;
@@ -140,6 +144,7 @@ static int __init my_char_driver_init(void) {
         device_remove_file(ret, &dev_attr_stop_timer);
         device_remove_file(ret, &dev_attr_start_timer);
         device_destroy(dev_class, dev);
+        class_destroy(dev_class);
         cdev_del(&cdev);
         unregister_chrdev(Major, "new_dev_1");
         return ret;
@@ -155,6 +160,7 @@ static void __exit my_char_driver_exit(void) {
     device_remove_file(NULL, &dev_attr_stop_timer);
     device_remove_file(NULL, &dev_attr_reset_var);
     device_destroy(dev_class, dev);
+    class_destroy(dev_class);
     cdev_del(&cdev);
     unregister_chrdev(Major, "new_dev_1");
     printk(KERN_INFO "My char driver exited\n");
